@@ -1,0 +1,137 @@
+---
+output:
+  word_document: default
+  html_document: default
+---
+Liang Hu
+
+load libraries
+```{r}
+library(caret)
+library(RWeka)
+library(e1071)
+library(DMwR)
+```
+
+read data
+```{r}
+setwd(getwd())
+credit <- read.csv("credit-g.csv")
+```
+
+use cross-validation to evaluate error
+```{r}
+ctrl_cv10 <- trainControl(method='cv', number=10, savePredictions = T,
+                          classProbs = T)
+```
+
+build a decision tree model without input engineering as reference
+```{r}
+set.seed(1992)
+model_DT <- train(class~., data=credit, method='J48', trControl=ctrl_cv10, tuneGrid=expand.grid(C=0.16, M=5))
+model_DT
+prediction_DT = predict(model_DT, credit)
+confusionMatrix(prediction_DT, credit$class)
+```
+
+select attributes to improve model
+```{r}
+filterCtrl <- sbfControl(functions = treebagSBF, method = "repeatedcv",
+                         repeats = 5)
+sbf(x=credit, y=credit$class, sbfControl = filterCtrl)
+```
+
+variable importance
+```{r}
+DT_Imp <- varImp(model_DT, scale = FALSE)
+DT_Imp
+plot(DT_Imp)
+```
+
+the Univariate Filters select 4 variables;
+"checking_status" is very important;
+therefore choose 5 variables
+```{r}
+credit_select <- credit[, c('checking_status', 'duration', 'credit_amount', 'installment_commitment', 'age', 'class')]
+```
+
+build the decision tree model based on selected attributes
+```{r}
+model_DT_select <- train(class~., data=credit_select, method='J48', trControl=ctrl_cv10, tuneGrid=expand.grid(C=0.16, M=5))
+model_DT_select
+prediction_DT_select = predict(model_DT_select, credit_select)
+confusionMatrix(prediction_DT_select, credit_select$class)
+```
+
+construct attributes to improve model
+```{r}
+credit_constr <- credit[, -ncol(credit)]
+#whether a worker?
+credit_constr$worker <- 'yes'
+credit_constr$worker[credit_constr$employment=='unemployed'] <- 'no'
+credit_constr$worker <- as.factor(credit_constr$worker)
+#gender
+credit_constr$gender <- ifelse(credit_constr$personal_status=="'female div/dep/mar'", 'female', 'male')
+credit_constr$gender <- as.factor(credit_constr$gender)
+#married?
+credit_constr$married <- ifelse(credit_constr$personal_status=="'male single'", 'no', 'yes')
+credit_constr$married <- as.factor(credit_constr$married)
+credit_constr$class <- credit$class
+```
+
+build decision tree model based on old and new attributes
+```{r}
+model_DT_constr <- train(class~., data=credit_constr, method='J48', trControl=ctrl_cv10, tuneGrid=expand.grid(C=0.16, M=5))
+model_DT_constr
+prediction_DT_constr = predict(model_DT_constr, credit_constr)
+confusionMatrix(prediction_DT_constr, credit_constr$class)
+```
+
+under-sampling to improve minority class prediction
+```{r}
+set.seed(1991)
+credit_down <- downSample(x = credit[, -ncol(credit)],
+                         y = credit$class)
+table(credit_down$Class) 
+```
+
+build decision tree model based on under-sampling data
+```{r}
+model_DT_down <- train(Class~., data=credit_down, method='J48', trControl=ctrl_cv10, tuneGrid=expand.grid(C=0.16, M=5))
+model_DT_down
+prediction_DT_down = predict(model_DT_down, credit_down)
+confusionMatrix(prediction_DT_down, credit_down$Class)
+```
+
+over-sampling to improve minority class prediction
+```{r}
+set.seed(1991)
+credit_up <- upSample(x = credit[, -ncol(credit)],
+                         y = credit$class)
+table(credit_up$Class) 
+```
+
+build decision tree model based on over-sampling data
+```{r}
+model_DT_up <- train(Class~., data=credit_up, method='J48', trControl=ctrl_cv10, tuneGrid=expand.grid(C=0.16, M=5))
+model_DT_up
+prediction_DT_up = predict(model_DT_up, credit_up)
+confusionMatrix(prediction_DT_up, credit_up$Class)
+```
+
+use SMOTE to improve minority class prediction
+```{r}
+set.seed(1991)
+credit_smote <- SMOTE(class~., data=credit)                         
+table(credit_smote$class) 
+```
+
+build decision tree model based on SMOTEed data
+```{r}
+model_DT_smote <- train(class~., data=credit_smote, method='J48', trControl=ctrl_cv10, tuneGrid=expand.grid(C=0.16, M=5))
+model_DT_smote
+prediction_DT_smote = predict(model_DT_smote, credit_smote)
+confusionMatrix(prediction_DT_smote, credit_smote$class)
+```
+
+
