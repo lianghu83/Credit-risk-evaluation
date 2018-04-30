@@ -1,0 +1,105 @@
+---
+output:
+  word_document: default
+  html_document: default
+---
+Advanced classfication to evaluate credit risk.
+
+Liang Hu
+
+Load libraries.
+```{r}
+library(caret)
+library(RWeka)
+library(e1071)
+library(DMwR)
+library(randomForest)
+library(ggplot2)
+```
+
+Read data.
+```{r}
+setwd(getwd())
+credit <- read.csv("credit-g.csv")
+```
+
+Use SMOTE to improve minority class prediction.
+```{r}
+set.seed(1991)
+credit_smote <- SMOTE(class~., data=credit)                         
+table(credit_smote$class) 
+```
+
+Use 10-fold cross-validation to evaluate error.
+```{r}
+ctrl_cv10 <- trainControl(method='cv', number=10, savePredictions=T,
+                          classProbs=T)
+```
+
+Build the random forest model.
+```{r}
+model_RF <- train(class~., data=credit_smote, method='rf', trControl=ctrl_cv10)
+model_RF
+prediction_RF <- predict(model_RF, credit_smote)
+confusionMatrix(prediction_RF, credit_smote$class)
+plot(model_RF)
+```
+
+Build the SVM model using linear kernel.
+```{r}
+model_SVM1 <- train(class~., data=credit_smote, method='svmLinear2', trControl=ctrl_cv10)
+model_SVM1
+prediction_SVM1 <- predict(model_SVM1, credit_smote)
+confusionMatrix(prediction_SVM1, credit_smote$class)
+```
+
+Tune the parameters of the SVM model using linear kernel.
+```{r}
+model_SVM2 <- train(class~., data=credit_smote, method='svmLinear2', trControl=ctrl_cv10, tuneGrid=expand.grid(cost=0.1*c(1:10)))
+model_SVM2
+prediction_SVM2 <- predict(model_SVM2, credit_smote)
+confusionMatrix(prediction_SVM2, credit_smote$class)
+plot(model_SVM2)
+```
+
+Build the SVM model using polynomial kernel.
+```{r}
+model_SVM3 <- train(class~., data=credit_smote, method='svmPoly', trControl=ctrl_cv10)
+model_SVM3
+prediction_SVM3 <- predict(model_SVM3, credit_smote)
+confusionMatrix(prediction_SVM3, credit_smote$class)
+```
+
+Tune the parameters of the SVM model using polynomial kernel.
+```{r}
+svmGrid <- expand.grid(degree=(1:10),
+                       scale=0.1,
+                       C=c(0.25,0.5,1))
+model_SVM4 <- train(class~., data=credit_smote, method='svmPoly', trControl=ctrl_cv10, tuneGrid=svmGrid)
+model_SVM4
+prediction_SVM4 <- predict(model_SVM4, credit_smote)
+confusionMatrix(prediction_SVM4, credit_smote$class)
+ggplot(model_SVM4)
+```
+
+Build the SVM model using RBF kernel.
+```{r}
+model_SVM5 <- train(class~., data=credit_smote, method='svmRadial', trControl=ctrl_cv10)
+model_SVM5
+prediction_SVM5 <- predict(model_SVM5, credit_smote)
+confusionMatrix(prediction_SVM5, credit_smote$class)
+plot(model_SVM5)
+```
+
+Tune parameters of the SVM model using RBF kernel.
+```{r}
+model_SVM6 <- train(class~., data=credit_smote, method='svmRadial', trControl=ctrl_cv10, tuneGrid=expand.grid(sigma=0.01*seq(1,2,0.1),
+                                         C=c(0.25,0.5,1)))
+model_SVM6
+prediction_SVM6 <- predict(model_SVM6, credit_smote)
+confusionMatrix(prediction_SVM6, credit_smote$class)
+plot(model_SVM6)
+```
+
+
+
